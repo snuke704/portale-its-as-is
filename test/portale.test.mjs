@@ -29,6 +29,7 @@ test("la pagina generata contiene una riga per ogni corso", () => {
     assert.ok(html.includes(c.titolo), `manca il corso ${c.titolo}`);
     assert.ok(html.includes(`${c.ore} h`), `mancano le ore di ${c.codice}`);
   }
+  assert.equal((html.match(/<tr>/g) ?? []).length, dati.corsi.length + 2);
 });
 
 test("la pagina generata mostra il totale ore corretto", () => {
@@ -42,4 +43,9 @@ test("nessun segreto finisce nella pagina pubblicata", () => {
   for (const re of sospetti) {
     assert.ok(!re.test(html), `stringa sospetta nel sito pubblicato: ${re}`);
   }
+});
+
+test("la versione di build e visibile nella pagina", () => {
+  const html = render(dati, "abc1234");
+  assert.ok(html.includes("build <code>abc1234</code>"));
 });

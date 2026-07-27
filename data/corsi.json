@@ -7,6 +7,8 @@
     { "codice": "SOA-ID",  "titolo": "Incident Detection & Response", "ore": 36, "docente": "P. Costanzo" },
     { "codice": "ACA-ARC", "titolo": "Architettura e Progettazione",  "ore": 48, "docente": "P. Costanzo" },
     { "codice": "ACA-IAC", "titolo": "Infrastructure as Code",        "ore": 60, "docente": "P. Costanzo" },
-    { "codice": "ACA-AUT", "titolo": "Automation e Pipeline con AWS", "ore": 76, "docente": "P. Costanzo" }
+    { "codice": "ACA-AUT", "titolo": "Automation e Pipeline con AWS", "ore": 76, "docente": "P. Costanzo" },
+    { "codice": "SOA-SA",  "titolo": "Sicurezza applicativa",          "ore": 30, "docente": "Da assegnare" },
+    { "codice": "ACA-AD",  "titolo": "Analisi dei dati",              "ore": 45, "docente": "Da assegnare" }
   ]
 }

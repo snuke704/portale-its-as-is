@@ -1,0 +1,11 @@
+node_modules/
+dist/
+__pycache__/
+*.py[cod]
+.terraform/
+.tools-venv/
+.moto-venv/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tf.zip

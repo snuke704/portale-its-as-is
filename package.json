@@ -1,12 +1,14 @@
 {
   "name": "portale-its",
   "version": "0.0.1",
-  "description": "sito corsi",
+  "description": "Portale corsi ITS con pipeline di qualita e pubblicazione controllata",
+  "private": true,
   "type": "module",
   "scripts": {
-    "build": "node src/build.mjs"
+    "build": "node src/build.mjs",
+    "test": "node --test"
   },
-  "dependencies": {
-    
+  "engines": {
+    "node": ">=22"
   }
 }
