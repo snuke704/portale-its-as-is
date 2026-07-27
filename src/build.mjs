@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync } from "node
 const OUT = "dist";
 
 export function totaleOre(corsi) {
-  return corsi.slice(1).reduce((acc, c) => acc + c.ore, 0);
+  return corsi.reduce((acc, c) => acc + c.ore, 0);
 }
 
 export function render(dati, versione) {
@@ -61,4 +61,4 @@ function main() {
   console.log(`OK  ${OUT}/index.html  (${dati.corsi.length} corsi, ${totaleOre(dati.corsi)} ore, build ${versione})`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+main();
