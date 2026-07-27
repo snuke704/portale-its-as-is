@@ -1,0 +1,9 @@
+.env*
+.pem
+node_modules/
+dist/
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars

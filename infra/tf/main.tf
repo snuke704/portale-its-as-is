@@ -1,62 +1,126 @@
-# portale its - infrastruttura
-# fatto da Marco, marzo 2024
+# Portale corsi ITS ICT Piemonte - infrastruttura di pubblicazione (binario B).
+# Stesse risorse del template CloudFormation, altro linguaggio.
 
-provider "aws" {
-  region     = "eu-south-1"
-  access_key = "test"
-  secret_key = "test"
+locals {
+  suffisso = "${var.env}-${var.owner}"
 
-  skip_credentials_validation = true
-  skip_metadata_api_check     = true
-  skip_requesting_account_id  = true
-  s3_use_path_style           = true
-
-  endpoints {
-    s3       = "http://127.0.0.1:5000"
-    dynamodb = "http://127.0.0.1:5000"
+  # Tag obbligatori da capitolato: il gate della pipeline verifica che Owner ci sia.
+  tag_comuni = {
+    Owner    = var.owner
+    Env      = var.env
+    Progetto = "portale-its"
   }
 }
 
-variable "api_token_gestionale" {
-  type    = string
-  default = "ghp_1a2B3c4D5e6F7g8H9i0JklMnOpQrStUvWxYz"
+# ---------- bucket dei log di accesso ----------
+resource "aws_s3_bucket" "log" {
+  bucket = "portale-its-log-${local.suffisso}"
+  tags   = local.tag_comuni
 }
 
-resource "aws_s3_bucket" "sito" {
-  bucket = "portale-its-sito"
+resource "aws_s3_bucket_ownership_controls" "log" {
+  bucket = aws_s3_bucket.log.id
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+      }
 }
 
-resource "aws_s3_bucket_website_configuration" "sito" {
-  bucket = aws_s3_bucket.sito.id
-  index_document {
-    suffix = "index.html"
+resource "aws_s3_bucket_versioning" "log" {
+  bucket = aws_s3_bucket.log.id
+  versioning_configuration {
+    status = "Enabled"
   }
 }
 
-resource "aws_s3_bucket_public_access_block" "sito" {
-  bucket                  = aws_s3_bucket.sito.id
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
+resource "aws_s3_bucket_server_side_encryption_configuration" "log" {
+  bucket = aws_s3_bucket.log.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
 }
 
-resource "aws_s3_bucket_policy" "sito" {
-  bucket = aws_s3_bucket.sito.id
+data "aws_caller_identity" "attuale" {}
+
+# Il servizio di logging di S3 deve poter scrivere nel bucket dei log.
+# Con ObjectOwnership = BucketOwnerEnforced le ACL sono disattivate,
+# quindi il permesso si concede con una bucket policy (modo moderno).
+resource "aws_s3_bucket_policy" "log" {
+  bucket = aws_s3_bucket.log.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
+      Sid       = "ConsentiScritturaLogS3"
       Effect    = "Allow"
-      Principal = "*"
-      Action    = "s3:*"
-      Resource  = "${aws_s3_bucket.sito.arn}/*"
+      Principal = { Service = "logging.s3.amazonaws.com" }
+      Action    = "s3:PutObject"
+      Resource  = "${aws_s3_bucket.log.arn}/*"
+      Condition = {
+        StringEquals = {
+          "aws:SourceAccount" = data.aws_caller_identity.attuale.account_id
+        }
+      }
     }]
   })
-  depends_on = [aws_s3_bucket_public_access_block.sito]
+}
+
+resource "aws_s3_bucket_public_access_block" "log" {
+  bucket                  = aws_s3_bucket.log.id
+  block_public_acls       = true
+    block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# ---------- bucket del sito ----------
+resource "aws_s3_bucket" "sito" {
+  bucket = "portale-its-sito-${local.suffisso}"
+  tags   = local.tag_comuni
+}
+
+resource "aws_s3_bucket_versioning" "sito" {
+  bucket = aws_s3_bucket.sito.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "sito" {
+  bucket = aws_s3_bucket.sito.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+  }
+
+resource "aws_s3_bucket_public_access_block" "sito" {
+  bucket                  = aws_s3_bucket.sito.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_logging" "sito" {
+  bucket        = aws_s3_bucket.sito.id
+  target_bucket = aws_s3_bucket.log.id
+  target_prefix = "sito/${var.env}/"
+
+  # senza la policy sul bucket di destinazione, S3 rifiuta di attivare i log
+  depends_on = [aws_s3_bucket_policy.log]
+}
+
+# ---------- tabella iscrizioni ----------
+resource "aws_kms_key" "iscrizioni" {
+  description         = "Chiave di cifratura della tabella iscrizioni del portale ITS"
+  enable_key_rotation = true
+  tags                = local.tag_comuni
 }
 
 resource "aws_dynamodb_table" "iscrizioni" {
-  name         = "iscrizioni"
+  name         = "portale-its-iscrizioni-${local.suffisso}"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "iscrizioneId"
 
@@ -64,8 +128,15 @@ resource "aws_dynamodb_table" "iscrizioni" {
     name = "iscrizioneId"
     type = "S"
   }
-}
 
-output "sito" {
-  value = aws_s3_bucket.sito.bucket
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.iscrizioni.arn
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  tags = local.tag_comuni
 }

@@ -1,20 +1,96 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: portale its
+Description: >
+  Portale corsi ITS ICT Piemonte - infrastruttura di pubblicazione.
+  Bucket del sito + bucket dei log di accesso + tabella iscrizioni.
 
 Parameters:
-  ApiTokenGestionale:
+  Env:
     Type: String
-    Description: token per il gestionale, non cambiarlo
-    Default: 'ghp_1a2B3c4D5e6F7g8H9i0JklMnOpQrStUvWxYz'
+    Description: Ambiente di destinazione
+    AllowedValues: [dev, test, prod]
+    Default: test
+  Owner:
+    Type: String
+    Description: Squadra responsabile della risorsa (governance ITS)
+    Default: squadra-0
+    MinLength: 3
 
 Resources:
+  LogBucket:
+    Type: AWS::S3::Bucket
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_18
+            comment: >-
+              Il bucket dei log non registra gli accessi a se stesso: sarebbe
+              una ricorsione infinita. Deroga approvata in fase di progetto.
+    Properties:
+      BucketName: !Sub 'portale-its-log-${Env}-${AWS::AccountId}'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Env
+          Value: !Ref Env
+        - Key: Progetto
+          Value: portale-its
+
+  LogBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref LogBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ConsentiScritturaLogS3
+            Effect: Allow
+            Principal:
+              Service: logging.s3.amazonaws.com
+            Action: 's3:PutObject'
+            Resource: !Sub '${LogBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                'aws:SourceAccount': !Ref 'AWS::AccountId'
 
   SiteBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: portale-its-sito
-      WebsiteConfiguration:
-        IndexDocument: index.html
+      BucketName: !Sub 'portale-its-sito-${Env}-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LoggingConfiguration:
+        DestinationBucketName: !Ref LogBucket
+        LogFilePrefix: !Sub 'sito/${Env}/'
+      Tags:
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Env
+          Value: !Ref Env
+        - Key: Progetto
+          Value: portale-its
 
   SiteBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -28,17 +104,56 @@ Resources:
             Action: 's3:*'
             Resource: !Sub '${SiteBucket.Arn}/*'
 
+  IscrizioniKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Chiave di cifratura della tabella iscrizioni del portale ITS
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ConsentiAmministrazioneAllAccount
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: 'kms:*'
+            Resource: '*'
+
   IscrizioniTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: iscrizioni
+      TableName: !Sub 'portale-its-iscrizioni-${Env}'
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: iscrizioneId
           AttributeType: S
       KeySchema:
         - AttributeName: iscrizioneId
-          KeyType: HASH
+                  KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: !Ref IscrizioniKey
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Env
+          Value: !Ref Env
+        - Key: Progetto
+          Value: portale-its
+
+Outputs:
+  SiteBucketName:
+    Description: Bucket che ospita il portale
+    Value: !Ref SiteBucket
+  LogBucketName:
+    Description: Bucket dei log di accesso
+    Value: !Ref LogBucket
+  IscrizioniTableName:
+    Description: Tabella delle iscrizioni
+    Value: !Ref IscrizioniTable
 
 Outputs:
   Sito:
