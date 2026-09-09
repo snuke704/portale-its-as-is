@@ -24,7 +24,7 @@ export function render(dati, versione) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Portale corsi - ${dati.istituto}</title>
+  <title>PORTALE NON DISPONIBILE - ${dati.istituto}</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
