@@ -1,5 +1,8 @@
 node_modules/
 dist/
+config/impostazioni.txt
+.env
+*.pem
 __pycache__/
 *.py[cod]
 .terraform/

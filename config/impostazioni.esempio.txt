@@ -1,0 +1,4 @@
+FTP_HOST=<host del cliente>
+FTP_USER=<utente>
+FTP_PASSWORD=<impostare come secret>
+AWS_TOKEN=<impostare come secret>

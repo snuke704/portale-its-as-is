@@ -6,6 +6,40 @@ Ambito: applicazione, infrastruttura come codice e processo di pubblicazione con
 
 La valutazione usa cinque lenti. Ogni constatazione separa il fatto verificabile dalla conseguenza per il cliente e dal rimedio proposto.
 
+## Constatazioni numerate
+
+### S1 — Bucket pubblico
+
+**Fatto:** la configurazione iniziale concedeva `s3:*` a `Principal: "*"`. **Conseguenza:** chiunque poteva modificare o cancellare il portale. **Rimedio:** eliminare la policy pubblica e bloccare ogni accesso pubblico. **Gravita:** bloccante.
+
+### S2 — Blocco accessi pubblici assente
+
+**Fatto:** il blocco degli accessi pubblici mancava o era disattivato. **Conseguenza:** una policy o ACL errata poteva riesporre i dati. **Rimedio:** attivare tutte le quattro protezioni S3. **Gravita:** bloccante.
+
+### S3 — Segreti nel repository
+
+**Fatto:** password FTP e token erano memorizzati in chiaro. **Conseguenza:** chiunque leggesse il repository poteva impersonare i servizi. **Rimedio:** rimuovere i valori, ruotarli e bloccare future esposizioni. **Gravita:** bloccante.
+
+### S4 — Cifratura assente
+
+**Fatto:** bucket e tabella non dichiaravano cifratura a riposo. **Conseguenza:** i dati non rispettavano il livello di protezione richiesto. **Rimedio:** cifrare S3 e DynamoDB. **Gravita:** bloccante.
+
+### A1 — Nessun versioning
+
+**Fatto:** il bucket non aveva versioning. **Conseguenza:** non esisteva una versione precedente certa da ripristinare. **Rimedio:** abilitare versioning e conservare artefatti di release. **Gravita:** bloccante.
+
+### A2 — Nessun ripristino puntuale
+
+**Fatto:** la tabella iscrizioni non aveva Point-in-Time Recovery. **Conseguenza:** una cancellazione errata poteva causare perdita permanente. **Rimedio:** attivare Point-in-Time Recovery. **Gravita:** seria.
+
+### A3 — Rollback non ripetibile
+
+**Fatto:** il runbook dipendeva da copie locali non verificate. **Conseguenza:** il ripristino era incerto e lento. **Rimedio:** documentare ripubblicazione per SHA e `git revert`. **Gravita:** bloccante.
+
+### O1 — Pubblicazione manuale
+
+**Fatto:** la pubblicazione dipendeva da Marco, dal suo portatile e da FileZilla. **Conseguenza:** assenze ed errori bloccavano il rilascio. **Rimedio:** usare pipeline, collaudo e approvazione tracciata. **Gravita:** bloccante.
+
 ## Sicurezza
 
 | ID | Gravita | Fatto | Conseguenza | Rimedio | Sforzo |
