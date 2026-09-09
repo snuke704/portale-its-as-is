@@ -4,14 +4,15 @@ La procedura completa e descritta in `DEPLOY.md`. La prova usa un commit che alt
 
 ## Misura
 
-- Inizio: registrato subito prima del `git revert`.
-- Fine: registrato dopo test e build verdi.
-- MTTR: da misurare durante la prova e riportare qui prima della consegna.
+- Inizio: subito prima del `git revert` del commit difettoso `09c4e58`.
+- Fine: dopo 7 test superati e build locale completata.
+- MTTR locale misurato: **1,14 secondi**.
+- Commit di ripristino: `9c2c78e`.
 
 ## Procedura eseguita
 
 ```bash
-git revert <sha-del-commit-difettoso> --no-edit
+git revert 09c4e58 --no-edit
 npm test
 npm run build
 ```
