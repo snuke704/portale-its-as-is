@@ -1,5 +1,6 @@
 // Generatore statico del Portale ITS. Zero dipendenze: solo Node.
 import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 
 const OUT = "dist";
 
@@ -61,4 +62,6 @@ function main() {
   console.log(`OK  ${OUT}/index.html  (${dati.corsi.length} corsi, ${totaleOre(dati.corsi)} ore, build ${versione})`);
 }
 
-main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}

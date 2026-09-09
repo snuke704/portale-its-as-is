@@ -1,0 +1,155 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+
+permissions:
+  contents: read
+
+env:
+  GATE_CHECKS: >-
+    CKV_AWS_18,CKV_AWS_19,CKV_AWS_20,CKV_AWS_21,CKV_AWS_28,CKV_AWS_119,
+    CKV_AWS_7,CKV_AWS_53,CKV_AWS_54,CKV_AWS_55,CKV_AWS_56,CKV2_AWS_6,CKV_ITS_1
+
+jobs:
+  rilevamento:
+    name: Struttura del progetto
+    runs-on: ubuntu-latest
+    outputs:
+      cfn: ${{ steps.binario.outputs.cfn }}
+      tf: ${{ steps.binario.outputs.tf }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Rileva i binari IaC
+        id: binario
+        shell: bash
+        run: |
+          if [ -f infra/portale-its.yaml ]; then echo "cfn=true" >> "$GITHUB_OUTPUT"; else echo "cfn=false" >> "$GITHUB_OUTPUT"; fi
+          if [ -f infra/tf/main.tf ]; then echo "tf=true" >> "$GITHUB_OUTPUT"; else echo "tf=false" >> "$GITHUB_OUTPUT"; fi
+          if [ ! -f infra/portale-its.yaml ] && [ ! -f infra/tf/main.tf ]; then
+            echo "::error::Nessun file IaC trovato."
+            exit 1
+          fi
+          find infra -maxdepth 2 -type f -print
+
+  applicazione:
+    name: App - install, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Installazione bloccata dal lockfile
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Nessun segreto nel sito
+        run: bash script/sniffa-segreti.sh dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: portale-dist
+          path: dist/
+          retention-days: 7
+
+  segreti:
+    name: Segreti
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Sniffer del progetto
+        run: bash script/sniffa-segreti.sh .
+
+      - name: Credenziali fuori dal repository
+        run: bash ci/nessun-segreto.sh
+
+      - name: Scansione Checkov
+        run: |
+          python -m pip install --quiet checkov
+          checkov -d . --framework secrets --enable-secret-scan-all-files \
+            --skip-path node_modules --skip-path dist --compact
+
+  infra-cloudformation:
+    name: IaC - CloudFormation
+    needs: rilevamento
+    if: needs.rilevamento.outputs.cfn == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Strumenti
+        run: python -m pip install --quiet cfn-lint checkov
+
+      - name: Sintassi e buone pratiche
+        run: cfn-lint infra/portale-its.yaml
+
+      - name: Regole bloccanti del capitolato
+        run: |
+          checkov -f infra/portale-its.yaml \
+            --external-checks-dir policy \
+            --check "$(echo "$GATE_CHECKS" | tr -d ' ')" \
+            --compact
+
+      - name: Audit completo informativo
+        run: checkov -f infra/portale-its.yaml --compact --soft-fail
+
+  infra-terraform:
+    name: IaC - Terraform
+    needs: rilevamento
+    if: needs.rilevamento.outputs.tf == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Terraform 1.15.8
+        run: |
+          curl -sSLo tf.zip https://releases.hashicorp.com/terraform/1.15.8/terraform_1.15.8_linux_amd64.zip
+          sudo unzip -oq tf.zip -d /usr/local/bin
+          rm tf.zip
+          terraform version
+
+      - name: Formattazione
+        working-directory: infra/tf
+        run: terraform fmt -check -recursive
+
+      - name: Inizializzazione e validazione
+        working-directory: infra/tf
+        run: |
+          terraform init -input=false -backend=false
+          terraform validate
+
+      - name: Regole bloccanti del capitolato
+        run: |
+          python -m pip install --quiet checkov
+          checkov -d infra/tf --framework terraform \
+            --external-checks-dir policy \
+            --check "$(echo "$GATE_CHECKS" | tr -d ' ')" \
+            --compact
+
+      - name: Audit completo informativo
+        run: checkov -d infra/tf --framework terraform --compact --soft-fail

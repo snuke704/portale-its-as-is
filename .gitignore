@@ -1,0 +1,14 @@
+node_modules/
+dist/
+config/impostazioni.txt
+.env
+*.pem
+__pycache__/
+*.py[cod]
+.terraform/
+.tools-venv/
+.moto-venv/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tf.zip
